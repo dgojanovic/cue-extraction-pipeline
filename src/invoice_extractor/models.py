@@ -71,3 +71,25 @@ class ExtractionError(BaseModel):
     document_name: str
     reason: str
     attempted_steps: list[str] = Field(default_factory=list)
+
+
+class FieldValidation(BaseModel):
+    """Validation result for one extracted field."""
+
+    field_path: str
+    value: str | None = None
+    normalized_value: str | None = None
+    matched_candidate: str | None = None
+    reason: str
+
+
+class ValidatedInvoiceExtraction(BaseModel):
+    """LLM extraction wrapped with deterministic candidate validation."""
+
+    document_name: str
+    extraction: InvoiceExtraction
+    valid_fields: list[FieldValidation] = Field(default_factory=list)
+    invalid_fields: list[FieldValidation] = Field(default_factory=list)
+    unchecked_fields: list[FieldValidation] = Field(default_factory=list)
+    candidate_warnings: list[str] = Field(default_factory=list)
+    source_warnings: list[str] = Field(default_factory=list)

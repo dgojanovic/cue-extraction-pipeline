@@ -4,16 +4,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections.abc import Sequence
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from invoice_extractor import __version__
 from invoice_extractor.candidates import extract_candidates
+from invoice_extractor.llm_extract import (
+    DEFAULT_MODEL,
+    DEFAULT_REASONING_EFFORT,
+)
 from invoice_extractor.models import ExtractionError
 from invoice_extractor.pdf_text import extract_pdf_text
+from invoice_extractor.pipeline import PipelineConfig, build_extraction_record
 
 
 def build_parser() -> argparse.ArgumentParser:
+    load_dotenv()
     parser = argparse.ArgumentParser(
         prog="invoice-extract",
         description="Run invoice extraction and reconciliation tasks.",
@@ -60,6 +69,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_ocr_arguments(inspect_candidates_parser)
     inspect_candidates_parser.set_defaults(handler=inspect_candidates_command)
+
+    extract_parser = subparsers.add_parser(
+        "extract",
+        help="Run direct-PDF LLM extraction and validate extracted fields against local candidates.",
+    )
+    extract_parser.add_argument(
+        "pdf_dir",
+        type=Path,
+        help="Directory containing invoice PDFs.",
+    )
+    extract_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("outputs/extractions.jsonl"),
+        help="Path to write validated extraction JSONL.",
+    )
+    extract_parser.add_argument(
+        "--model",
+        default=os.getenv("OPENAI_MODEL", DEFAULT_MODEL),
+        help="OpenAI model to use for direct-PDF extraction.",
+    )
+    extract_parser.add_argument(
+        "--reasoning-effort",
+        choices=["minimal", "none", "low", "medium", "high", "xhigh"],
+        default=os.getenv("OPENAI_REASONING_EFFORT", DEFAULT_REASONING_EFFORT),
+        help="Reasoning effort for GPT-5-family models.",
+    )
+    _add_ocr_arguments(extract_parser)
+    extract_parser.set_defaults(handler=extract_command)
 
     return parser
 
@@ -132,6 +170,24 @@ def inspect_candidates_command(args: argparse.Namespace) -> None:
     _print_inspect_candidates_summary(records, args.out)
 
 
+def extract_command(args: argparse.Namespace) -> None:
+    pdf_paths = sorted(args.pdf_dir.glob("*.pdf"))
+    records = []
+    config = PipelineConfig(
+        model=args.model,
+        reasoning_effort=args.reasoning_effort,
+        use_ocr=args.ocr,
+        tesseract_cmd=args.tesseract_cmd,
+        ocr_lang=args.ocr_lang,
+    )
+
+    for pdf_path in pdf_paths:
+        records.append(build_extraction_record(pdf_path, config=config))
+
+    _write_jsonl(args.out, records)
+    _print_extract_summary(records, args.out)
+
+
 def _extract_text_from_args(pdf_path: Path, args: argparse.Namespace):
     return extract_pdf_text(
         pdf_path,
@@ -193,6 +249,27 @@ def _print_inspect_candidates_summary(records: list[dict], output_path: Path) ->
     print(f"Wrote {output_path}")
 
 
+def _print_extract_summary(records: list[dict], output_path: Path) -> None:
+    extraction_records = [
+        record for record in records if record["record_type"] == "validated_extraction"
+    ]
+    error_records = [record for record in records if record["record_type"] == "error"]
+    invalid_count = sum(len(record["invalid_fields"]) for record in extraction_records)
+
+    print(
+        "Processed "
+        f"{len(records)} files: "
+        f"{len(extraction_records)} validated extractions, "
+        f"{invalid_count} invalid fields, "
+        f"{len(error_records)} errors."
+    )
+
+    for record in error_records:
+        print(f"- {record['document_name']}: {record['reason']}")
+
+    print(f"Wrote {output_path}")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -202,3 +279,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         return
 
     args.handler(args)
+
+
+if __name__ == "__main__":
+    main()
