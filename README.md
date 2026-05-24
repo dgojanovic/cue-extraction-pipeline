@@ -1,6 +1,6 @@
 # Invoice Extraction POC
 
-Original task prompt: [TASK.md](/Users/domagojgojanovicbozic/Repositories/tasks/NER-challange/TASK.md)
+Original task prompt: [TASK.md](TASK.md)
 
 ## Setup
 
@@ -112,7 +112,7 @@ Current local result:
 12 invoices: 4 auto-accept, 8 review, 0 reject.
 ```
 
-Triage thresholds and decision tree: [docs/triage.md](/Users/domagojgojanovicbozic/Repositories/tasks/NER-challange/docs/triage.md)
+Triage thresholds and decision tree: [docs/triage.md](docs/triage.md)
 
 ## Observability
 
@@ -169,7 +169,7 @@ This POC traces LLM calls as the highest-risk and highest-cost step. Production 
 
 Production design note:
 
-- [docs/DESIGN.md](/Users/domagojgojanovicbozic/Repositories/tasks/NER-challange/docs/DESIGN.md)
+- [docs/DESIGN.md](docs/DESIGN.md)
 
 It covers production rollout, queues vs synchronous work, human review, model rollouts, model-selection levers, and deterministic/LLM/human boundaries.
 
