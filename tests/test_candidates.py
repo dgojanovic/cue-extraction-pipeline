@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from invoice_extractor.candidates import extract_candidates
+from invoice_extractor.extraction.candidates import extract_candidates
 
 
 def test_extract_candidates_finds_core_invoice_values() -> None:

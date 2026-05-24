@@ -1,4 +1,4 @@
-from invoice_extractor.models import ConfidenceLevel, FieldStatus, InvoiceExtraction, LineItem
+from invoice_extractor.core.models import ConfidenceLevel, FieldStatus, InvoiceExtraction, LineItem
 
 
 def test_invoice_extraction_defaults_optional_fields_to_unknown() -> None:

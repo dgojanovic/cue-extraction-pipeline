@@ -5,15 +5,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from decimal import Decimal
 
-from invoice_extractor.candidates import ExtractionCandidates
-from invoice_extractor.models import (
+from invoice_extractor.extraction.candidates import ExtractionCandidates
+from invoice_extractor.core.models import (
     ExtractedField,
     FieldStatus,
     FieldValidation,
     InvoiceExtraction,
     ValidatedInvoiceExtraction,
 )
-from invoice_extractor.normalize import (
+from invoice_extractor.core.normalize import (
     normalize_amount,
     normalize_currency,
     normalize_date,

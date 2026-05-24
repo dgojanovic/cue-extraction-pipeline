@@ -4,7 +4,7 @@ from pathlib import Path
 import pymupdf
 
 from invoice_extractor.cli import build_parser, main
-from invoice_extractor.models import InvoiceExtraction
+from invoice_extractor.core.models import InvoiceExtraction
 
 
 def test_cli_parser_builds() -> None:
@@ -105,7 +105,7 @@ def test_extract_command_writes_validated_extraction_report(tmp_path, monkeypatc
         )
 
     monkeypatch.setattr(
-        "invoice_extractor.pipeline.extract_invoice_from_pdf",
+        "invoice_extractor.extraction.pipeline.extract_invoice_from_pdf",
         fake_extract_invoice_from_pdf,
     )
     output_path = tmp_path / "extractions.jsonl"
@@ -139,7 +139,7 @@ def test_extract_command_writes_error_record_for_failed_document(tmp_path, monke
         raise RuntimeError("model call failed")
 
     monkeypatch.setattr(
-        "invoice_extractor.pipeline.extract_invoice_from_pdf",
+        "invoice_extractor.extraction.pipeline.extract_invoice_from_pdf",
         fake_extract_invoice_from_pdf,
     )
     output_path = tmp_path / "extractions.jsonl"

@@ -11,20 +11,20 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from invoice_extractor import __version__
-from invoice_extractor.candidates import extract_candidates
-from invoice_extractor.llm_extract import (
+from invoice_extractor.extraction.candidates import extract_candidates
+from invoice_extractor.extraction.llm import (
     DEFAULT_MODEL,
     DEFAULT_REASONING_EFFORT,
 )
-from invoice_extractor.models import ExtractionError
-from invoice_extractor.pdf_text import extract_pdf_text
-from invoice_extractor.pipeline import (
+from invoice_extractor.core.models import ExtractionError
+from invoice_extractor.extraction.pdf_text import extract_pdf_text
+from invoice_extractor.extraction.pipeline import (
     DEFAULT_OCR_LANG,
     DEFAULT_USE_OCR,
     PipelineConfig,
     build_extraction_record,
 )
-from invoice_extractor.triage import run_triage
+from invoice_extractor.triage.decision import run_triage
 
 
 def build_parser() -> argparse.ArgumentParser:

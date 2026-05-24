@@ -1,7 +1,8 @@
 from decimal import Decimal
 
-from invoice_extractor.models import InvoiceExtraction
-from invoice_extractor.triage import BankTransaction, triage_extraction_record
+from invoice_extractor.core.models import InvoiceExtraction
+from invoice_extractor.triage.decision import triage_extraction_record
+from invoice_extractor.triage.matcher import BankTransaction
 
 
 def test_triage_auto_accepts_exact_dkk_payment() -> None:

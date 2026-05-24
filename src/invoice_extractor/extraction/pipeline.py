@@ -5,16 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from invoice_extractor.candidates import extract_candidates
-from invoice_extractor.llm_extract import (
+from invoice_extractor.extraction.candidates import extract_candidates
+from invoice_extractor.extraction.llm import (
     DEFAULT_MODEL,
     DEFAULT_REASONING_EFFORT,
     ReasoningEffort,
     extract_invoice_from_pdf,
 )
-from invoice_extractor.models import ExtractionError, ValidatedInvoiceExtraction
-from invoice_extractor.pdf_text import extract_pdf_text
-from invoice_extractor.validate import validate_extraction
+from invoice_extractor.core.models import ExtractionError, ValidatedInvoiceExtraction
+from invoice_extractor.extraction.pdf_text import extract_pdf_text
+from invoice_extractor.extraction.validate import validate_extraction
 
 DEFAULT_USE_OCR = True
 DEFAULT_OCR_LANG = "eng+dan+deu"

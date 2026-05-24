@@ -4,7 +4,7 @@ from evals.evaluator import (
     score_document,
     score_pipeline_record,
 )
-from invoice_extractor.models import InvoiceExtraction
+from invoice_extractor.core.models import InvoiceExtraction
 
 
 def test_score_document_normalizes_values_and_accepts_fuzzy_supplier_name() -> None:

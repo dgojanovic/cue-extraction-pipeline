@@ -1,4 +1,4 @@
-from invoice_extractor.normalize import (
+from invoice_extractor.core.normalize import (
     normalize_amount,
     normalize_currency,
     normalize_date,

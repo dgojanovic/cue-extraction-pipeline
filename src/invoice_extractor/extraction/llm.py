@@ -9,7 +9,7 @@ from typing import Literal
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from invoice_extractor.models import InvoiceExtraction
+from invoice_extractor.core.models import InvoiceExtraction
 
 ReasoningEffort = Literal["minimal", "none", "low", "medium", "high", "xhigh"]
 

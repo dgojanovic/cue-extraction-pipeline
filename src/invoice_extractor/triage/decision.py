@@ -2,22 +2,23 @@
 
 from __future__ import annotations
 
-import csv
 import json
-import re
-import unicodedata
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from rapidfuzz import fuzz
+from invoice_extractor.core.models import FieldStatus, InvoiceExtraction, ValidatedInvoiceExtraction
+from invoice_extractor.core.normalize import normalize_amount, normalize_currency
+from invoice_extractor.triage.matcher import (
+    BankTransaction,
+    InvoiceMatchInput,
+    has_multiple_close_matches,
+    load_bank_transactions,
+    public_match,
+    score_bank_transactions,
+)
 
-from invoice_extractor.models import FieldStatus, InvoiceExtraction, ValidatedInvoiceExtraction
-from invoice_extractor.normalize import normalize_amount, normalize_currency
-
-SUPPLIER_HIGH_THRESHOLD = 0.75
-SUPPLIER_MEDIUM_THRESHOLD = 0.50
 VALIDATED_CRITICAL_FIELD_PATHS = frozenset(
     {
         "invoice_id",
@@ -25,18 +26,6 @@ VALIDATED_CRITICAL_FIELD_PATHS = frozenset(
         "totals.total_amount",
     }
 )
-AMOUNT_REVIEW_TOLERANCE = Decimal("1.00")
-
-
-@dataclass(frozen=True)
-class BankTransaction:
-    txn_id: str
-    date: str
-    amount: Decimal
-    raw_amount: str
-    counterparty: str
-    reference: str
-    category: str
 
 
 @dataclass(frozen=True)
@@ -76,28 +65,6 @@ def load_extraction_records(path: str | Path) -> list[dict[str, Any]]:
         if line.strip():
             records.append(json.loads(line))
     return records
-
-
-def load_bank_transactions(path: str | Path) -> list[BankTransaction]:
-    transactions: list[BankTransaction] = []
-    with Path(path).open(newline="", encoding="utf-8") as csv_file:
-        reader = csv.DictReader(csv_file)
-        for row in reader:
-            amount = _parse_decimal(row.get("amount"))
-            if amount is None:
-                continue
-            transactions.append(
-                BankTransaction(
-                    txn_id=row.get("txn_id", ""),
-                    date=row.get("date", ""),
-                    amount=abs(amount),
-                    raw_amount=row.get("amount", ""),
-                    counterparty=row.get("counterparty", ""),
-                    reference=row.get("reference", ""),
-                    category=row.get("category", ""),
-                )
-            )
-    return transactions
 
 
 def triage_extraction_record(
@@ -153,13 +120,13 @@ def triage_extraction_record(
         or reason.startswith("unsupported_currency")
     ]
 
-    scored_transactions = sorted(
-        (
-            _check_bank_transaction(invoice, transaction)
-            for transaction in bank_transactions
+    scored_transactions = score_bank_transactions(
+        InvoiceMatchInput(
+            invoice_id=invoice.invoice_id,
+            supplier_name=invoice.supplier_name,
+            total_amount=invoice.total_amount,
         ),
-        key=lambda match: match["sort_score"],
-        reverse=True,
+        bank_transactions,
     )
     plausible_matches = [match for match in scored_transactions if match["is_plausible"]]
     top_match = plausible_matches[0] if plausible_matches else None
@@ -174,7 +141,7 @@ def triage_extraction_record(
         routing_reasons.append("no_plausible_bank_match")
     else:
         routing_reasons.extend(top_match["reasons"])
-        if _has_multiple_close_matches(plausible_matches):
+        if has_multiple_close_matches(plausible_matches):
             routing_reasons.append("multiple_candidate_matches")
 
         if extraction_confidence != "high":
@@ -198,7 +165,7 @@ def triage_extraction_record(
         "extraction_confidence": extraction_confidence,
         "match_status": match_status,
         "reasons": _dedupe_preserving_order(routing_reasons),
-        "matched_transactions": [_public_match(match) for match in plausible_matches[:3]],
+        "matched_transactions": [public_match(match) for match in plausible_matches[:3]],
     }
 
 
@@ -283,150 +250,6 @@ def _questionable_extraction_reasons(reasons: list[str]) -> list[str]:
     ]
 
 
-def _check_bank_transaction(
-    invoice: ExtractedInvoice,
-    transaction: BankTransaction,
-) -> dict[str, Any]:
-    reference_status, reference_reason, reference_strength = _reference_check(
-        invoice.invoice_id,
-        transaction.reference,
-    )
-    supplier_score = _supplier_score(invoice.supplier_name, transaction.counterparty)
-    supplier_status = _supplier_status(supplier_score)
-    amount_status, amount_reason, amount_strength = _amount_check(
-        invoice,
-        transaction,
-    )
-    match_status = _match_status(reference_status, amount_status, supplier_status)
-    sort_score = _sort_score(reference_strength, amount_strength, supplier_score)
-
-    return {
-        "txn_id": transaction.txn_id,
-        "date": transaction.date,
-        "amount": transaction.raw_amount,
-        "counterparty": transaction.counterparty,
-        "reference": transaction.reference,
-        "category": transaction.category,
-        "is_plausible": match_status != "none",
-        "match_status": match_status,
-        "sort_score": round(sort_score, 4),
-        "signal_checks": {
-            "reference": {
-                "status": reference_status,
-                "reason": reference_reason,
-            },
-            "amount": {
-                "status": amount_status,
-                "reason": amount_reason,
-            },
-            "supplier": {
-                "status": supplier_status,
-                "score": round(supplier_score, 4),
-            },
-        },
-        "reasons": _questionable_match_reasons(
-            match_status=match_status,
-            reference_status=reference_status,
-            reference_reason=reference_reason,
-            amount_status=amount_status,
-            amount_reason=amount_reason,
-            supplier_status=supplier_status,
-            supplier_score=supplier_score,
-        ),
-    }
-
-
-def _questionable_match_reasons(
-    *,
-    match_status: str,
-    reference_status: str,
-    reference_reason: str | None,
-    amount_status: str,
-    amount_reason: str | None,
-    supplier_status: str,
-    supplier_score: float,
-) -> list[str]:
-    if match_status == "clean":
-        return []
-
-    reasons = []
-    if reference_status == "missing":
-        reasons.append(reference_reason or "invoice_id_missing_from_bank_reference")
-    if amount_status in {"questionable", "mismatch", "missing"}:
-        reasons.append(amount_reason or f"amount_{amount_status}")
-    if reference_status == "missing" and supplier_status != "high":
-        reasons.append(f"supplier_fuzzy_match_{supplier_status}:{supplier_score:.2f}")
-    return reasons
-
-
-def _public_match(match: dict[str, Any]) -> dict[str, Any]:
-    public_match = dict(match)
-    public_match.pop("is_plausible", None)
-    public_match.pop("sort_score", None)
-    return public_match
-
-
-def _reference_check(invoice_id: str | None, reference: str) -> tuple[str, str | None, float]:
-    if not invoice_id:
-        return "missing", None, 0.0
-
-    normalized_reference = _normalize_identifier(reference)
-    normalized_invoice_id = _normalize_identifier(invoice_id)
-    if normalized_invoice_id and normalized_invoice_id in normalized_reference:
-        return "exact", "invoice_id_found_in_bank_reference", 1.0
-    return "missing", None, 0.0
-
-
-def _amount_check(
-    invoice: ExtractedInvoice,
-    transaction: BankTransaction,
-) -> tuple[str, str | None, float]:
-    if invoice.total_amount is None or invoice.total_amount <= 0:
-        return "missing", None, 0.0
-
-    if _amounts_close(transaction.amount, invoice.total_amount, AMOUNT_REVIEW_TOLERANCE):
-        return "exact", "amount_within_tolerance", 1.0
-    return "questionable", "amount_mismatch_requires_review", 0.5
-
-
-def _supplier_score(supplier_name: str | None, counterparty: str) -> float:
-    if not supplier_name or not counterparty:
-        return 0.0
-    return fuzz.token_set_ratio(_normalize_match_text(supplier_name), _normalize_match_text(counterparty)) / 100
-
-
-def _supplier_status(supplier_score: float) -> str:
-    if supplier_score >= SUPPLIER_HIGH_THRESHOLD:
-        return "high"
-    if supplier_score >= SUPPLIER_MEDIUM_THRESHOLD:
-        return "medium"
-    return "low"
-
-
-def _match_status(reference_status: str, amount_status: str, supplier_status: str) -> str:
-    if reference_status == "exact" and amount_status == "exact":
-        return "clean"
-    if reference_status == "missing" and amount_status == "exact" and supplier_status == "high":
-        return "clean"
-    if reference_status == "exact" and amount_status == "questionable":
-        return "questionable"
-    if reference_status == "missing" and amount_status == "exact" and supplier_status == "medium":
-        return "questionable"
-    if reference_status == "missing" and amount_status == "questionable" and supplier_status == "high":
-        return "questionable"
-    return "none"
-
-
-def _sort_score(reference_strength: float, amount_strength: float, supplier_score: float) -> float:
-    return reference_strength * 0.5 + amount_strength * 0.35 + supplier_score * 0.15
-
-
-def _has_multiple_close_matches(matches: list[dict[str, Any]]) -> bool:
-    if len(matches) < 2:
-        return False
-    return matches[1]["sort_score"] >= matches[0]["sort_score"] - 0.05
-
-
 def _total_integrity_failed(extraction: InvoiceExtraction) -> bool:
     pre_tax = _field_decimal(extraction.totals.pre_tax_amount)
     tax = _field_decimal(extraction.totals.tax_amount)
@@ -462,37 +285,6 @@ def _format_decimal(value: Decimal | None) -> str | None:
     if value is None:
         return None
     return format(value, ".2f")
-
-
-def _amounts_close(left: Decimal, right: Decimal, tolerance: Decimal) -> bool:
-    return abs(left - right) <= tolerance
-
-
-def _normalize_identifier(value: str) -> str:
-    normalized = value.upper().strip()
-    normalized = normalized.replace("—", "-").replace("–", "-")
-    normalized = re.sub(r"\s+", "", normalized)
-    normalized = re.sub(r"[^A-Z0-9-]", "", normalized)
-    return normalized
-
-
-def _normalize_match_text(value: str) -> str:
-    normalized = value.upper()
-    replacements = {
-        "Ä": "AE",
-        "Ö": "OE",
-        "Ü": "UE",
-        "ß": "SS",
-        "Æ": "AE",
-        "Ø": "O",
-        "Å": "A",
-    }
-    for source, replacement in replacements.items():
-        normalized = normalized.replace(source, replacement)
-    normalized = unicodedata.normalize("NFKD", normalized)
-    normalized = "".join(character for character in normalized if not unicodedata.combining(character))
-    normalized = re.sub(r"[^A-Z0-9]+", " ", normalized)
-    return " ".join(normalized.split())
 
 
 def _dedupe_preserving_order(values: list[str]) -> list[str]:

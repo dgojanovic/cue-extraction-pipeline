@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from invoice_extractor.llm_extract import extract_invoice_from_pdf
-from invoice_extractor.models import InvoiceExtraction
+from invoice_extractor.extraction.llm import extract_invoice_from_pdf
+from invoice_extractor.core.models import InvoiceExtraction
 
 
 class _FakeResponses:

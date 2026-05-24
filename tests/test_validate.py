@@ -1,6 +1,6 @@
-from invoice_extractor.candidates import extract_candidates
-from invoice_extractor.models import FieldStatus, InvoiceExtraction
-from invoice_extractor.validate import validate_extraction
+from invoice_extractor.extraction.candidates import extract_candidates
+from invoice_extractor.core.models import FieldStatus, InvoiceExtraction
+from invoice_extractor.extraction.validate import validate_extraction
 
 
 def test_validate_extraction_splits_valid_invalid_and_unchecked_fields() -> None:

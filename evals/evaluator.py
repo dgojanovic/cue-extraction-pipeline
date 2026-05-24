@@ -16,16 +16,16 @@ from typing import Any, Literal
 from dotenv import load_dotenv
 from rapidfuzz import fuzz
 
-from invoice_extractor.llm_extract import DEFAULT_MODEL, DEFAULT_REASONING_EFFORT
-from invoice_extractor.models import ExtractedField, FieldStatus, InvoiceExtraction
-from invoice_extractor.normalize import (
+from invoice_extractor.extraction.llm import DEFAULT_MODEL, DEFAULT_REASONING_EFFORT
+from invoice_extractor.core.models import ExtractedField, FieldStatus, InvoiceExtraction
+from invoice_extractor.core.normalize import (
     normalize_amount,
     normalize_currency,
     normalize_date,
     normalize_percentage,
     normalize_quantity,
 )
-from invoice_extractor.pipeline import (
+from invoice_extractor.extraction.pipeline import (
     DEFAULT_OCR_LANG,
     DEFAULT_USE_OCR,
     PipelineConfig,

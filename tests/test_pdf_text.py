@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pymupdf
 
-from invoice_extractor.pdf_text import extract_pdf_text
+from invoice_extractor.extraction.pdf_text import extract_pdf_text
 
 
 def test_extract_pdf_text_reads_embedded_text() -> None:
