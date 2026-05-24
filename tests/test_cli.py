@@ -86,7 +86,7 @@ def test_extract_command_writes_validated_extraction_report(tmp_path, monkeypatc
     document.save(pdf_path)
     document.close()
 
-    def fake_extract_invoice_from_pdf(pdf_path, *, model, reasoning_effort):
+    def fake_extract_invoice_from_pdf(pdf_path, *, model, reasoning_effort, trace_path):
         return InvoiceExtraction(
             document_name=Path(pdf_path).name,
             extraction_method=f"fake:{model}:{reasoning_effort}",
@@ -135,7 +135,7 @@ def test_extract_command_writes_error_record_for_failed_document(tmp_path, monke
     pdf_path = pdf_dir / "broken.pdf"
     pdf_path.write_bytes(b"not a real pdf")
 
-    def fake_extract_invoice_from_pdf(pdf_path, *, model, reasoning_effort):
+    def fake_extract_invoice_from_pdf(pdf_path, *, model, reasoning_effort, trace_path):
         raise RuntimeError("model call failed")
 
     monkeypatch.setattr(

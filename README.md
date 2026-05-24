@@ -36,9 +36,12 @@ Run extraction for all PDFs:
 Result:
 
 - `outputs/extractions.jsonl`
+- `outputs/traces.jsonl`
 - each successful record has `record_type: "validated_extraction"`
 - failed PDFs produce `record_type: "error"` with `reason` and `attempted_steps`
 - fields are split into `valid_fields`, `invalid_fields`, and `unchecked_fields`
+
+LLM calls are traced to `outputs/traces.jsonl` by default. Use `--trace-out <path>` to change the trace file or `--no-trace` to disable it.
 
 Optional inspection commands:
 
@@ -109,6 +112,57 @@ Current local result:
 
 Triage thresholds and decision tree: [docs/triage.md](/Users/domagojgojanovicbozic/Repositories/tasks/NER-challange/docs/triage.md)
 
+## Observability
+
+Each LLM call writes a JSONL trace record with metadata rather than full invoice content:
+
+```json
+{
+   "trace_id":"1370b2f8-b0eb-432a-abe3-acfeaf4c5bb8",
+   "record_type":"trace",
+   "event_type":"llm_call",
+   "step":"openai_pdf_extraction",
+   "document_name":"invoice_01.pdf",
+   "provider":"openai",
+   "model":"gpt-5-mini",
+   "reasoning_effort":"minimal",
+   "started_at":"2026-05-24T14:02:28.176876+00:00",
+   "input_summary":{
+      "file_name":"invoice_01.pdf",
+      "file_type":"application/pdf",
+      "file_bytes":3301,
+      "file_sha256":"f1dbedc1a4ccee66fb6a122d82872bdef3a1620caf97519888b71a74e47d032e",
+      "prompt_chars":838
+   },
+   "ended_at":"2026-05-24T14:02:50.482142+00:00",
+   "latency_ms":22306,
+   "status":"success",
+   "usage":{
+      "input_tokens":1074,
+      "output_tokens":1376,
+      "total_tokens":2450
+   },
+   "output_summary":{
+      "field_status_counts":{
+         "found":18,
+         "unknown":1
+      },
+      "confidence_counts":{
+         "high":18,
+         "unknown":1
+      },
+      "line_item_count":2,
+      "warning_count":0
+   }
+}
+```
+
+Useful alerts: LLM error rate, latency p95, token/cost spikes, extraction error rate, invalid-field rate, hallucination rate in evals, reviewer correction rate, review-rate increase, and auto-accept-rate drop.
+
+JSONL is used here as a local/dev artifact because it is append-friendly, survives partial runs, and is easy to inspect with `tail` and `jq`. In production, the same structured events should be sent to a logging or tracing backend such as OpenTelemetry, Datadog, ELK, or CloudWatch, with tenant/document ids and span relationships.
+
+This POC traces LLM calls as the highest-risk and highest-cost step. Production tracing should cover every major stage: text extraction, OCR, candidate extraction, validation, bank matching, triage, and human review. Those traces should still avoid raw invoice content and instead log metadata, timings, counts, warnings, outcomes, and reasons.
+
 ## Task 4: Design
 
 Production design note:
@@ -127,7 +181,7 @@ It covers production rollout, queues vs synchronous work, human review, model ro
 Current status:
 
 ```text
-39 tests passed
+40 tests passed
 ruff: all checks passed
 ```
 

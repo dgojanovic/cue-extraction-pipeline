@@ -18,6 +18,7 @@ from invoice_extractor.extraction.validate import validate_extraction
 
 DEFAULT_USE_OCR = True
 DEFAULT_OCR_LANG = "eng+dan+deu"
+DEFAULT_TRACE_PATH = Path("outputs/traces.jsonl")
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class PipelineConfig:
     use_ocr: bool = DEFAULT_USE_OCR
     tesseract_cmd: str = "tesseract"
     ocr_lang: str = DEFAULT_OCR_LANG
+    trace_path: Path | None = DEFAULT_TRACE_PATH
 
 
 class ExtractionPipelineError(Exception):
@@ -58,6 +60,7 @@ def run_extraction_pipeline(
             path,
             model=active_config.model,
             reasoning_effort=active_config.reasoning_effort,
+            trace_path=active_config.trace_path,
         )
 
         attempted_steps.append("pymupdf_text_extraction")

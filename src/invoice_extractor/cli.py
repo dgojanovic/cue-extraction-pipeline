@@ -20,6 +20,7 @@ from invoice_extractor.core.models import ExtractionError
 from invoice_extractor.extraction.pdf_text import extract_pdf_text
 from invoice_extractor.extraction.pipeline import (
     DEFAULT_OCR_LANG,
+    DEFAULT_TRACE_PATH,
     DEFAULT_USE_OCR,
     PipelineConfig,
     build_extraction_record,
@@ -109,6 +110,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Reasoning effort for GPT-5-family models.",
     )
     _add_ocr_arguments(extract_parser)
+    _add_trace_arguments(extract_parser)
     extract_parser.set_defaults(handler=extract_command)
 
     triage_parser = subparsers.add_parser(
@@ -162,6 +164,24 @@ def _add_ocr_arguments(parser: argparse.ArgumentParser) -> None:
         "--ocr-lang",
         default=DEFAULT_OCR_LANG,
         help="Tesseract language code, for example eng or eng+dan+deu.",
+    )
+
+
+def _add_trace_arguments(parser: argparse.ArgumentParser) -> None:
+    trace_group = parser.add_mutually_exclusive_group()
+    trace_group.add_argument(
+        "--trace-out",
+        dest="trace_path",
+        type=Path,
+        default=DEFAULT_TRACE_PATH,
+        help="Path to write JSONL LLM call traces.",
+    )
+    trace_group.add_argument(
+        "--no-trace",
+        dest="trace_path",
+        action="store_const",
+        const=None,
+        help="Disable JSONL LLM call tracing.",
     )
 
 
@@ -224,6 +244,7 @@ def extract_command(args: argparse.Namespace) -> None:
         use_ocr=args.use_ocr,
         tesseract_cmd=args.tesseract_cmd,
         ocr_lang=args.ocr_lang,
+        trace_path=args.trace_path,
     )
 
     for pdf_path in pdf_paths:

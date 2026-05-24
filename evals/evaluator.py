@@ -27,6 +27,7 @@ from invoice_extractor.core.normalize import (
 )
 from invoice_extractor.extraction.pipeline import (
     DEFAULT_OCR_LANG,
+    DEFAULT_TRACE_PATH,
     DEFAULT_USE_OCR,
     PipelineConfig,
     build_extraction_record,
@@ -228,6 +229,7 @@ def run_evaluation(
         "reasoning_effort": config.reasoning_effort,
         "use_ocr": config.use_ocr,
         "ocr_lang": config.ocr_lang,
+        "trace_path": str(config.trace_path) if config.trace_path else None,
     }
     return report
 
@@ -291,6 +293,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_OCR_LANG,
         help="Tesseract language code, for example eng or eng+dan+deu.",
     )
+    trace_group = parser.add_mutually_exclusive_group()
+    trace_group.add_argument(
+        "--trace-out",
+        dest="trace_path",
+        type=Path,
+        default=DEFAULT_TRACE_PATH,
+        help="Path to write JSONL LLM call traces.",
+    )
+    trace_group.add_argument(
+        "--no-trace",
+        dest="trace_path",
+        action="store_const",
+        const=None,
+        help="Disable JSONL LLM call tracing.",
+    )
     parser.add_argument(
         "--fail-under",
         type=float,
@@ -314,6 +331,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         use_ocr=args.use_ocr,
         tesseract_cmd=args.tesseract_cmd,
         ocr_lang=args.ocr_lang,
+        trace_path=args.trace_path,
     )
 
     report = run_evaluation(golden_path=args.golden, pdf_dir=args.pdf_dir, config=config)
