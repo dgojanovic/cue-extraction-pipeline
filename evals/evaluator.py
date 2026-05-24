@@ -25,7 +25,12 @@ from invoice_extractor.normalize import (
     normalize_percentage,
     normalize_quantity,
 )
-from invoice_extractor.pipeline import PipelineConfig, build_extraction_record
+from invoice_extractor.pipeline import (
+    DEFAULT_OCR_LANG,
+    DEFAULT_USE_OCR,
+    PipelineConfig,
+    build_extraction_record,
+)
 
 ComparisonKind = Literal["exact", "fuzzy"]
 Normalizer = Callable[[Any], str | None]
@@ -262,10 +267,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("OPENAI_REASONING_EFFORT", DEFAULT_REASONING_EFFORT),
         help="Reasoning effort for GPT-5-family models.",
     )
-    parser.add_argument(
+    ocr_group = parser.add_mutually_exclusive_group()
+    ocr_group.add_argument(
         "--ocr",
+        dest="use_ocr",
         action="store_true",
-        help="Use Tesseract OCR when embedded PDF text is missing or sparse.",
+        default=DEFAULT_USE_OCR,
+        help="Use Tesseract OCR when embedded PDF text is missing or sparse. Enabled by default.",
+    )
+    ocr_group.add_argument(
+        "--no-ocr",
+        dest="use_ocr",
+        action="store_false",
+        help="Disable Tesseract OCR fallback.",
     )
     parser.add_argument(
         "--tesseract-cmd",
@@ -274,7 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--ocr-lang",
-        default="eng",
+        default=DEFAULT_OCR_LANG,
         help="Tesseract language code, for example eng or eng+dan+deu.",
     )
     parser.add_argument(
@@ -297,7 +311,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     config = PipelineConfig(
         model=args.model,
         reasoning_effort=args.reasoning_effort,
-        use_ocr=args.ocr,
+        use_ocr=args.use_ocr,
         tesseract_cmd=args.tesseract_cmd,
         ocr_lang=args.ocr_lang,
     )

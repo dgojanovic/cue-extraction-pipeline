@@ -16,6 +16,9 @@ from invoice_extractor.models import ExtractionError, ValidatedInvoiceExtraction
 from invoice_extractor.pdf_text import extract_pdf_text
 from invoice_extractor.validate import validate_extraction
 
+DEFAULT_USE_OCR = True
+DEFAULT_OCR_LANG = "eng+dan+deu"
+
 
 @dataclass(frozen=True)
 class PipelineConfig:
@@ -23,9 +26,9 @@ class PipelineConfig:
 
     model: str = DEFAULT_MODEL
     reasoning_effort: ReasoningEffort = DEFAULT_REASONING_EFFORT
-    use_ocr: bool = False
+    use_ocr: bool = DEFAULT_USE_OCR
     tesseract_cmd: str = "tesseract"
-    ocr_lang: str = "eng"
+    ocr_lang: str = DEFAULT_OCR_LANG
 
 
 class ExtractionPipelineError(Exception):

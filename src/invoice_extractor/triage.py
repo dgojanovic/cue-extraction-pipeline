@@ -170,7 +170,7 @@ def triage_extraction_record(
         outcome = "reject"
         routing_reasons.extend(rejection_reasons)
     elif top_match is None:
-        outcome = "reject"
+        outcome = "review"
         routing_reasons.append("no_plausible_bank_match")
     else:
         routing_reasons.extend(top_match["reasons"])

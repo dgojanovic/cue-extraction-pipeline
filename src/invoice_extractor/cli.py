@@ -18,7 +18,12 @@ from invoice_extractor.llm_extract import (
 )
 from invoice_extractor.models import ExtractionError
 from invoice_extractor.pdf_text import extract_pdf_text
-from invoice_extractor.pipeline import PipelineConfig, build_extraction_record
+from invoice_extractor.pipeline import (
+    DEFAULT_OCR_LANG,
+    DEFAULT_USE_OCR,
+    PipelineConfig,
+    build_extraction_record,
+)
 from invoice_extractor.triage import run_triage
 
 
@@ -42,6 +47,8 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_text_parser.add_argument(
         "pdf_dir",
         type=Path,
+        nargs="?",
+        default=Path("pdf_invoices"),
         help="Directory containing invoice PDFs.",
     )
     inspect_text_parser.add_argument(
@@ -60,6 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_candidates_parser.add_argument(
         "pdf_dir",
         type=Path,
+        nargs="?",
+        default=Path("pdf_invoices"),
         help="Directory containing invoice PDFs.",
     )
     inspect_candidates_parser.add_argument(
@@ -78,6 +87,8 @@ def build_parser() -> argparse.ArgumentParser:
     extract_parser.add_argument(
         "pdf_dir",
         type=Path,
+        nargs="?",
+        default=Path("pdf_invoices"),
         help="Directory containing invoice PDFs.",
     )
     extract_parser.add_argument(
@@ -128,10 +139,19 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _add_ocr_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
+    ocr_group = parser.add_mutually_exclusive_group()
+    ocr_group.add_argument(
         "--ocr",
+        dest="use_ocr",
         action="store_true",
-        help="Run Tesseract OCR when embedded PDF text is missing or too sparse.",
+        default=DEFAULT_USE_OCR,
+        help="Run Tesseract OCR when embedded PDF text is missing or too sparse. Enabled by default.",
+    )
+    ocr_group.add_argument(
+        "--no-ocr",
+        dest="use_ocr",
+        action="store_false",
+        help="Disable Tesseract OCR fallback.",
     )
     parser.add_argument(
         "--tesseract-cmd",
@@ -140,7 +160,7 @@ def _add_ocr_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ocr-lang",
-        default="eng",
+        default=DEFAULT_OCR_LANG,
         help="Tesseract language code, for example eng or eng+dan+deu.",
     )
 
@@ -201,7 +221,7 @@ def extract_command(args: argparse.Namespace) -> None:
     config = PipelineConfig(
         model=args.model,
         reasoning_effort=args.reasoning_effort,
-        use_ocr=args.ocr,
+        use_ocr=args.use_ocr,
         tesseract_cmd=args.tesseract_cmd,
         ocr_lang=args.ocr_lang,
     )
@@ -225,7 +245,7 @@ def triage_command(args: argparse.Namespace) -> None:
 def _extract_text_from_args(pdf_path: Path, args: argparse.Namespace):
     return extract_pdf_text(
         pdf_path,
-        use_ocr=args.ocr,
+        use_ocr=args.use_ocr,
         tesseract_cmd=args.tesseract_cmd,
         ocr_lang=args.ocr_lang,
     )

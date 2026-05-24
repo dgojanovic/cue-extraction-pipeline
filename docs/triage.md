@@ -146,7 +146,7 @@ Start with one extraction record.
 
 ```text
 6. No plausible bank match?
-   ├─ Yes -> REJECT
+   ├─ Yes -> REVIEW
    └─ No  -> continue
 ```
 
@@ -177,13 +177,13 @@ Top-level `reasons` are empty for auto-accepted records. Positive details are st
 
 ### Review
 
-An invoice is routed to review when there is a plausible bank match but at least one signal is questionable, or extraction confidence is below the auto-accept threshold.
+An invoice is routed to review when there is no plausible bank match, when there is a plausible bank match but at least one signal is questionable, or when extraction confidence is below the auto-accept threshold.
 
 Review reasons are listed below.
 
 ### Reject
 
-An invoice is rejected when extraction failed, critical extracted data is missing or invalid, or no plausible bank match exists.
+An invoice is rejected when extraction failed or critical extracted data is missing or invalid.
 
 Reject reasons are listed below.
 
@@ -199,6 +199,7 @@ Reject reasons are listed below.
 | `multiple_candidate_matches` | More than one bank transaction scored close enough to the best candidate that picking one automatically would be risky. |
 | `extraction_confidence_below_auto_accept_threshold` | Extraction did not meet high-confidence requirements, even though a bank match exists. |
 | `critical_candidate_validation_missing:<fields>` | One or more candidate-validated critical fields did not receive deterministic candidate confirmation. This lowers extraction confidence. |
+| `no_plausible_bank_match` | No bank transaction met even the questionable-match rules, so a reviewer needs to resolve whether the invoice was unpaid, paid outside the provided statement, or matched by a pattern the POC does not support. |
 
 ## Reject Reasons
 
@@ -213,7 +214,6 @@ Reject reasons are listed below.
 | `unsupported_currency` | Extracted currency is not supported by the pipeline. |
 | `critical_field_failed_validation:<fields>` | Candidate validation rejected a critical field such as `invoice_id`, `currency`, or `totals.total_amount`. |
 | `total_integrity_failed` | Extracted totals do not reconcile: `pre_tax + tax - discount` differs from `total` by more than the allowed rounding tolerance. |
-| `no_plausible_bank_match` | No bank transaction met even the questionable-match rules. |
 
 ## Notes
 

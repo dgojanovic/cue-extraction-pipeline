@@ -30,7 +30,7 @@ def test_inspect_text_command_writes_jsonl_report(tmp_path) -> None:
 def test_inspect_candidates_command_writes_jsonl_report(tmp_path) -> None:
     output_path = tmp_path / "candidates.jsonl"
 
-    main(["inspect-candidates", "pdf_invoices", "--out", str(output_path)])
+    main(["inspect-candidates", "pdf_invoices", "--no-ocr", "--out", str(output_path)])
 
     records = [json.loads(line) for line in output_path.read_text().splitlines()]
 
@@ -47,7 +47,7 @@ def test_inspect_candidates_command_writes_jsonl_report(tmp_path) -> None:
     )
 
 
-def test_inspect_candidates_command_can_use_ocr(tmp_path) -> None:
+def test_inspect_candidates_command_uses_ocr_by_default(tmp_path) -> None:
     output_path = tmp_path / "candidates.jsonl"
     fake_tesseract = tmp_path / "tesseract"
     fake_tesseract.write_text(
@@ -60,7 +60,6 @@ def test_inspect_candidates_command_can_use_ocr(tmp_path) -> None:
         [
             "inspect-candidates",
             "pdf_invoices",
-            "--ocr",
             "--tesseract-cmd",
             str(fake_tesseract),
             "--out",

@@ -172,6 +172,33 @@ def test_triage_routes_amount_mismatch_to_review() -> None:
     assert decision["matched_transactions"][0]["signal_checks"]["amount"]["status"] == "questionable"
 
 
+def test_triage_routes_missing_bank_match_to_review() -> None:
+    record = _validated_record(
+        invoice_id="INV-404",
+        supplier_name="Missing Match Supplier",
+        currency="DKK",
+        total_amount="100.00",
+        pre_tax_amount="80.00",
+        tax_amount="20.00",
+    )
+    transaction = BankTransaction(
+        txn_id="TXN-404",
+        date="2026-04-27",
+        amount=Decimal("999.00"),
+        raw_amount="-999.00",
+        counterparty="Other Supplier",
+        reference="Other invoice",
+        category="supplier_payment",
+    )
+
+    decision = triage_extraction_record(record, [transaction])
+
+    assert decision["outcome"] == "review"
+    assert decision["match_status"] == "none"
+    assert decision["reasons"] == ["no_plausible_bank_match"]
+    assert decision["matched_transactions"] == []
+
+
 def test_triage_rejects_extraction_error_record() -> None:
     decision = triage_extraction_record(
         {
