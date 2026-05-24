@@ -168,3 +168,83 @@ def test_extract_command_writes_error_record_for_failed_document(tmp_path, monke
             "attempted_steps": ["openai_pdf_extraction"],
         }
     ]
+
+
+def test_triage_command_writes_jsonl_report(tmp_path) -> None:
+    extraction = InvoiceExtraction(
+        document_name="invoice.pdf",
+        invoice_id={"normalized_value": "INV-100", "status": "found", "confidence": "high"},
+        supplier_name={"normalized_value": "Acme Tools", "status": "found", "confidence": "high"},
+        currency={"normalized_value": "DKK", "status": "found", "confidence": "high"},
+        totals={
+            "pre_tax_amount": {
+                "normalized_value": "80.00",
+                "status": "found",
+                "confidence": "high",
+            },
+            "tax_amount": {
+                "normalized_value": "20.00",
+                "status": "found",
+                "confidence": "high",
+            },
+            "total_amount": {
+                "normalized_value": "100.00",
+                "status": "found",
+                "confidence": "high",
+            },
+        },
+    )
+    extractions_path = tmp_path / "extractions.jsonl"
+    extractions_path.write_text(
+        json.dumps(
+            {
+                "record_type": "validated_extraction",
+                "document_name": "invoice.pdf",
+                "extraction": extraction.model_dump(mode="json"),
+                "valid_fields": [
+                    {"field_path": "invoice_id", "reason": "normalized_value_found_in_candidates"},
+                    {"field_path": "currency", "reason": "normalized_value_found_in_candidates"},
+                    {
+                        "field_path": "totals.total_amount",
+                        "reason": "normalized_value_found_in_candidates",
+                    },
+                ],
+                "invalid_fields": [],
+                "unchecked_fields": [],
+                "candidate_warnings": [],
+                "source_warnings": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bank_path = tmp_path / "bank.csv"
+    bank_path.write_text(
+        "\n".join(
+            [
+                "txn_id,date,amount,counterparty,reference,category",
+                "TXN-1,2026-05-01,-100.00,ACME TOOLS,Payment INV-100,supplier_payment",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "triage.jsonl"
+
+    main(
+        [
+            "triage",
+            "--extractions",
+            str(extractions_path),
+            "--bank",
+            str(bank_path),
+            "--out",
+            str(output_path),
+        ]
+    )
+
+    records = [json.loads(line) for line in output_path.read_text().splitlines()]
+
+    assert records[0]["record_type"] == "triage_decision"
+    assert records[0]["outcome"] == "auto_accept"
+    assert records[0]["matched_transactions"][0]["txn_id"] == "TXN-1"

@@ -19,6 +19,7 @@ from invoice_extractor.llm_extract import (
 from invoice_extractor.models import ExtractionError
 from invoice_extractor.pdf_text import extract_pdf_text
 from invoice_extractor.pipeline import PipelineConfig, build_extraction_record
+from invoice_extractor.triage import run_triage
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -98,6 +99,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_ocr_arguments(extract_parser)
     extract_parser.set_defaults(handler=extract_command)
+
+    triage_parser = subparsers.add_parser(
+        "triage",
+        help="Match validated invoice extractions against bank transactions and route outcomes.",
+    )
+    triage_parser.add_argument(
+        "--extractions",
+        type=Path,
+        default=Path("outputs/extractions.jsonl"),
+        help="Path to validated extraction JSONL.",
+    )
+    triage_parser.add_argument(
+        "--bank",
+        type=Path,
+        default=Path("bank_transactions.csv"),
+        help="Path to bank transaction CSV.",
+    )
+    triage_parser.add_argument(
+        "--out",
+        type=Path,
+        default=Path("outputs/triage_report.jsonl"),
+        help="Path to write triage JSONL.",
+    )
+    triage_parser.set_defaults(handler=triage_command)
 
     return parser
 
@@ -188,6 +213,15 @@ def extract_command(args: argparse.Namespace) -> None:
     _print_extract_summary(records, args.out)
 
 
+def triage_command(args: argparse.Namespace) -> None:
+    records = run_triage(
+        extractions_path=args.extractions,
+        bank_path=args.bank,
+    )
+    _write_jsonl(args.out, records)
+    _print_triage_summary(records, args.out)
+
+
 def _extract_text_from_args(pdf_path: Path, args: argparse.Namespace):
     return extract_pdf_text(
         pdf_path,
@@ -267,6 +301,25 @@ def _print_extract_summary(records: list[dict], output_path: Path) -> None:
     for record in error_records:
         print(f"- {record['document_name']}: {record['reason']}")
 
+    print(f"Wrote {output_path}")
+
+
+def _print_triage_summary(records: list[dict], output_path: Path) -> None:
+    outcome_counts = {
+        "auto_accept": sum(1 for record in records if record["outcome"] == "auto_accept"),
+        "review": sum(1 for record in records if record["outcome"] == "review"),
+        "reject": sum(1 for record in records if record["outcome"] == "reject"),
+    }
+    print(
+        "Triaged "
+        f"{len(records)} invoices: "
+        f"{outcome_counts['auto_accept']} auto-accept, "
+        f"{outcome_counts['review']} review, "
+        f"{outcome_counts['reject']} reject."
+    )
+    for record in records:
+        if record["outcome"] != "auto_accept":
+            print(f"- {record['document_name']}: {record['outcome']} ({', '.join(record['reasons'])})")
     print(f"Wrote {output_path}")
 
 
