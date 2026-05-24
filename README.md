@@ -25,6 +25,8 @@ The extractor sends the original PDF directly to the LLM because invoice layout 
 
 Model confidence is not treated as calibrated. Trust is derived from schema checks, normalization, candidate validation against PDF/OCR text, total integrity checks, and downstream triage signals. Output fields are split into `valid_fields`, `invalid_fields`, and `unchecked_fields`.
 
+I use candidate validation rather than evidence spans as the main hallucination guard. Evidence spans are useful for reviewer UX, but the model can hallucinate evidence too. Candidate validation checks whether the normalized value independently appears in PDF/OCR-derived text, so it is a stronger grounding signal for this POC.
+
 ## Task 1: Extraction
 
 Run extraction for all PDFs:
